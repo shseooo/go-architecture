@@ -5,6 +5,7 @@ _*
 *.test
 .DS_Store
 engine
+/import
 bin/
 *.out
 tmp_app/

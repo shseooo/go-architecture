@@ -9,18 +9,18 @@ services:
       mysql:
         condition: service_healthy
     volumes:
-      - ./config.json:/app/config.json
+      - ../config.json:/app/config.json
 
   mysql:
     image: mysql:8.3
     container_name: go_clean_arch_mysql
     command: mysqld --user=root
     volumes:
-      - ./article.sql:/docker-entrypoint-initdb.d/init.sql
+      - ../schema.sql:/docker-entrypoint-initdb.d/init.sql
     ports:
       - 3306:3306
     environment:
-      - MYSQL_DATABASE=article
+      - MYSQL_DATABASE=shop
       - MYSQL_USER=user
       - MYSQL_PASSWORD=password
       - MYSQL_ROOT_PASSWORD=root

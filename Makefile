@@ -30,20 +30,20 @@ deps:
 	@echo "Required Tools Are Available"
 
 dev-env: ## Bootstrap Environment (with a Docker-Compose help).
-	@ docker-compose up -d --build mysql
+	@ docker-compose -f deploy/docker-compose.yaml up -d --build mysql
 
 dev-env-test: dev-env ## Run application (within a Docker-Compose help)
 	@ $(MAKE) image-build
-	docker-compose up web
+	docker-compose -f deploy/docker-compose.yaml up web
 
 dev-air: $(AIR) ## Starts AIR ( Continuous Development app).
 	air
 
 docker-stop:
-	@ docker-compose down
+	@ docker-compose -f deploy/docker-compose.yaml down
 
 docker-teardown:
-	@ docker-compose down --remove-orphans -v
+	@ docker-compose -f deploy/docker-compose.yaml down --remove-orphans -v
 
 # ~~~ Code Actions ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -63,7 +63,7 @@ build: ## Builds binary
 	@ go build \
 		-trimpath  \
 		-o engine \
-		./app/
+		./cmd/api
 	@ echo "done"
 
 
@@ -73,12 +73,20 @@ build-race: ## Builds binary (with -race flag)
 		-trimpath  \
 		-race      \
 		-o engine \
-		./app/
+		./cmd/api
 	@ echo "done"
 
 
 go-generate: $(MOCKERY) ## Runs go generte ./...
 	go generate ./...
+
+swagger: ## Generate OpenAPI 2.0 docs (swaggo/swag) into ./docs
+	@ printf "Generating swagger docs... "
+	@ swag init --generalInfo cmd/api/main.go --parseDependency --parseInternal --output docs
+	@ echo "done"
+
+test-e2e: ## Run end-to-end tests (requires Docker)
+	@ go test -tags e2e -timeout 15m ./e2e/...
 
 
 TESTS_ARGS := --format testname --jsonfile gotestsum.json.out
@@ -103,7 +111,7 @@ tests-complete: tests $(TPARSE) ## Run Tests & parse details
 image-build:
 	@ echo "Docker Build"
 	@ DOCKER_BUILDKIT=0 docker build \
-		--file Dockerfile \
+		--file deploy/Dockerfile \
 		--tag go-clean-arch \
 			.
 
