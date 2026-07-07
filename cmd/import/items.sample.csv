@@ -1,0 +1,7 @@
+name,price,stock_quantity,type,author,isbn,artist,etc,director,actor,category_ids
+Clean Architecture,33000,50,BOOK,Robert C. Martin,9780134494166,,,,,2
+The Go Programming Language,40000,30,BOOK,Alan Donovan,9780134190440,,,,,2
+Nevermind,15000,100,ALBUM,,,Nirvana,1991 remaster,,,3
+OK Computer,18000,80,ALBUM,,,Radiohead,,,,3
+Inception,12000,40,MOVIE,,,,,Christopher Nolan,Leonardo DiCaprio,4
+Parasite,13000,60,MOVIE,,,,,Bong Joon-ho,Song Kang-ho,4
