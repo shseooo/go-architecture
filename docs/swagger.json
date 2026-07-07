@@ -1,0 +1,786 @@
+{
+    "swagger": "2.0",
+    "info": {
+        "description": "회원/상품/주문 API — clean architecture, stdlib net/http.",
+        "title": "Shop API",
+        "contact": {},
+        "version": "1.0"
+    },
+    "host": "localhost:9090",
+    "basePath": "/",
+    "paths": {
+        "/items": {
+            "get": {
+                "description": "카테고리·가격범위 필터와 날짜/가격 정렬을 지원한다. 정렬 키는 화이트리스트로 제한된다.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "items"
+                ],
+                "summary": "상품 검색 (동적 쿼리)",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "카테고리 ID",
+                        "name": "categoryId",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "최소 가격",
+                        "name": "minPrice",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "최대 가격",
+                        "name": "maxPrice",
+                        "in": "query"
+                    },
+                    {
+                        "enum": [
+                            "newest",
+                            "oldest",
+                            "price_asc",
+                            "price_desc"
+                        ],
+                        "type": "string",
+                        "description": "정렬",
+                        "name": "sort",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "페이지 크기 (기본 20, 최대 100)",
+                        "name": "limit",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "오프셋 (기본 0)",
+                        "name": "offset",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/app_rest.Envelope-array_github_com_shseooo_go-architecture_app_domain_Item"
+                        }
+                    }
+                }
+            },
+            "post": {
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "items"
+                ],
+                "summary": "상품 등록",
+                "parameters": [
+                    {
+                        "description": "상품 정보 (type: BOOK|ALBUM|MOVIE)",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/app_rest.itemRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Created",
+                        "schema": {
+                            "$ref": "#/definitions/app_rest.Envelope-github_com_shseooo_go-architecture_app_domain_Item"
+                        }
+                    },
+                    "400": {
+                        "description": "입력 검증 실패",
+                        "schema": {
+                            "$ref": "#/definitions/app_rest.ErrorEnvelope"
+                        }
+                    },
+                    "500": {
+                        "description": "서버 에러",
+                        "schema": {
+                            "$ref": "#/definitions/app_rest.ErrorEnvelope"
+                        }
+                    }
+                }
+            }
+        },
+        "/items/{id}": {
+            "get": {
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "items"
+                ],
+                "summary": "상품 조회",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "상품 ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/app_rest.Envelope-github_com_shseooo_go-architecture_app_domain_Item"
+                        }
+                    },
+                    "404": {
+                        "description": "상품 없음",
+                        "schema": {
+                            "$ref": "#/definitions/app_rest.ErrorEnvelope"
+                        }
+                    }
+                }
+            },
+            "put": {
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "items"
+                ],
+                "summary": "상품 수정",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "상품 ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "상품 정보",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/app_rest.itemRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/app_rest.Envelope-github_com_shseooo_go-architecture_app_domain_Item"
+                        }
+                    },
+                    "400": {
+                        "description": "입력 검증 실패",
+                        "schema": {
+                            "$ref": "#/definitions/app_rest.ErrorEnvelope"
+                        }
+                    },
+                    "404": {
+                        "description": "상품 없음",
+                        "schema": {
+                            "$ref": "#/definitions/app_rest.ErrorEnvelope"
+                        }
+                    }
+                }
+            }
+        },
+        "/members": {
+            "post": {
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "members"
+                ],
+                "summary": "회원 등록",
+                "parameters": [
+                    {
+                        "description": "회원 정보",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/app_rest.memberRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Created",
+                        "schema": {
+                            "$ref": "#/definitions/app_rest.Envelope-github_com_shseooo_go-architecture_app_domain_Member"
+                        }
+                    },
+                    "400": {
+                        "description": "입력 검증 실패",
+                        "schema": {
+                            "$ref": "#/definitions/app_rest.ErrorEnvelope"
+                        }
+                    },
+                    "500": {
+                        "description": "서버 에러",
+                        "schema": {
+                            "$ref": "#/definitions/app_rest.ErrorEnvelope"
+                        }
+                    }
+                }
+            }
+        },
+        "/members/{id}": {
+            "get": {
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "members"
+                ],
+                "summary": "회원 조회",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "회원 ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/app_rest.Envelope-github_com_shseooo_go-architecture_app_domain_Member"
+                        }
+                    },
+                    "400": {
+                        "description": "잘못된 ID",
+                        "schema": {
+                            "$ref": "#/definitions/app_rest.ErrorEnvelope"
+                        }
+                    },
+                    "404": {
+                        "description": "회원 없음",
+                        "schema": {
+                            "$ref": "#/definitions/app_rest.ErrorEnvelope"
+                        }
+                    }
+                }
+            }
+        },
+        "/members/{id}/orders": {
+            "get": {
+                "description": "회원의 주문 목록을 조회한다. 주문 항목·배송은 배치 로딩으로 N+1 없이 함께 반환된다.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "orders"
+                ],
+                "summary": "주문 내역 조회",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "회원 ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/app_rest.Envelope-array_github_com_shseooo_go-architecture_app_domain_Order"
+                        }
+                    },
+                    "400": {
+                        "description": "잘못된 ID",
+                        "schema": {
+                            "$ref": "#/definitions/app_rest.ErrorEnvelope"
+                        }
+                    }
+                }
+            }
+        },
+        "/orders": {
+            "post": {
+                "description": "재고를 확인·차감하고 배송 정보와 함께 주문을 생성한다 (단일 트랜잭션).",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "orders"
+                ],
+                "summary": "상품 주문",
+                "parameters": [
+                    {
+                        "description": "주문 정보",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/app_rest.orderRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Created",
+                        "schema": {
+                            "$ref": "#/definitions/app_rest.Envelope-github_com_shseooo_go-architecture_app_domain_Order"
+                        }
+                    },
+                    "400": {
+                        "description": "입력 검증 실패",
+                        "schema": {
+                            "$ref": "#/definitions/app_rest.ErrorEnvelope"
+                        }
+                    },
+                    "404": {
+                        "description": "회원/상품 없음",
+                        "schema": {
+                            "$ref": "#/definitions/app_rest.ErrorEnvelope"
+                        }
+                    },
+                    "409": {
+                        "description": "재고 부족",
+                        "schema": {
+                            "$ref": "#/definitions/app_rest.ErrorEnvelope"
+                        }
+                    }
+                }
+            }
+        },
+        "/orders/{id}/cancel": {
+            "post": {
+                "description": "주문을 취소하고 각 상품의 재고를 복원한다 (단일 트랜잭션).",
+                "tags": [
+                    "orders"
+                ],
+                "summary": "주문 취소",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "주문 ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "취소 완료"
+                    },
+                    "404": {
+                        "description": "주문 없음",
+                        "schema": {
+                            "$ref": "#/definitions/app_rest.ErrorEnvelope"
+                        }
+                    },
+                    "409": {
+                        "description": "이미 취소된 주문",
+                        "schema": {
+                            "$ref": "#/definitions/app_rest.ErrorEnvelope"
+                        }
+                    }
+                }
+            }
+        }
+    },
+    "definitions": {
+        "app_rest.Envelope-array_github_com_shseooo_go-architecture_app_domain_Item": {
+            "type": "object",
+            "properties": {
+                "data": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/github_com_shseooo_go-architecture_app_domain.Item"
+                    }
+                },
+                "meta": {
+                    "$ref": "#/definitions/app_rest.Meta"
+                }
+            }
+        },
+        "app_rest.Envelope-array_github_com_shseooo_go-architecture_app_domain_Order": {
+            "type": "object",
+            "properties": {
+                "data": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/github_com_shseooo_go-architecture_app_domain.Order"
+                    }
+                },
+                "meta": {
+                    "$ref": "#/definitions/app_rest.Meta"
+                }
+            }
+        },
+        "app_rest.Envelope-github_com_shseooo_go-architecture_app_domain_Item": {
+            "type": "object",
+            "properties": {
+                "data": {
+                    "$ref": "#/definitions/github_com_shseooo_go-architecture_app_domain.Item"
+                },
+                "meta": {
+                    "$ref": "#/definitions/app_rest.Meta"
+                }
+            }
+        },
+        "app_rest.Envelope-github_com_shseooo_go-architecture_app_domain_Member": {
+            "type": "object",
+            "properties": {
+                "data": {
+                    "$ref": "#/definitions/github_com_shseooo_go-architecture_app_domain.Member"
+                },
+                "meta": {
+                    "$ref": "#/definitions/app_rest.Meta"
+                }
+            }
+        },
+        "app_rest.Envelope-github_com_shseooo_go-architecture_app_domain_Order": {
+            "type": "object",
+            "properties": {
+                "data": {
+                    "$ref": "#/definitions/github_com_shseooo_go-architecture_app_domain.Order"
+                },
+                "meta": {
+                    "$ref": "#/definitions/app_rest.Meta"
+                }
+            }
+        },
+        "app_rest.ErrorBody": {
+            "type": "object",
+            "properties": {
+                "code": {
+                    "type": "string"
+                },
+                "message": {
+                    "type": "string"
+                }
+            }
+        },
+        "app_rest.ErrorEnvelope": {
+            "type": "object",
+            "properties": {
+                "error": {
+                    "$ref": "#/definitions/app_rest.ErrorBody"
+                }
+            }
+        },
+        "app_rest.Meta": {
+            "type": "object",
+            "properties": {
+                "pagination": {
+                    "$ref": "#/definitions/app_rest.Pagination"
+                }
+            }
+        },
+        "app_rest.Pagination": {
+            "type": "object",
+            "properties": {
+                "has_next": {
+                    "type": "boolean"
+                },
+                "limit": {
+                    "type": "integer"
+                },
+                "offset": {
+                    "type": "integer"
+                },
+                "total": {
+                    "type": "integer"
+                }
+            }
+        },
+        "app_rest.itemRequest": {
+            "type": "object",
+            "properties": {
+                "actor": {
+                    "type": "string"
+                },
+                "artist": {
+                    "type": "string"
+                },
+                "author": {
+                    "type": "string"
+                },
+                "category_ids": {
+                    "type": "array",
+                    "items": {
+                        "type": "integer"
+                    }
+                },
+                "director": {
+                    "type": "string"
+                },
+                "etc": {
+                    "type": "string"
+                },
+                "isbn": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "price": {
+                    "type": "integer"
+                },
+                "stock_quantity": {
+                    "type": "integer"
+                },
+                "type": {
+                    "$ref": "#/definitions/github_com_shseooo_go-architecture_app_domain.ItemType"
+                }
+            }
+        },
+        "app_rest.memberRequest": {
+            "type": "object",
+            "properties": {
+                "address": {
+                    "$ref": "#/definitions/github_com_shseooo_go-architecture_app_domain.Address"
+                },
+                "name": {
+                    "type": "string"
+                }
+            }
+        },
+        "app_rest.orderLineRequest": {
+            "type": "object",
+            "properties": {
+                "count": {
+                    "type": "integer"
+                },
+                "item_id": {
+                    "type": "integer"
+                }
+            }
+        },
+        "app_rest.orderRequest": {
+            "type": "object",
+            "properties": {
+                "address": {
+                    "$ref": "#/definitions/github_com_shseooo_go-architecture_app_domain.Address"
+                },
+                "lines": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/app_rest.orderLineRequest"
+                    }
+                },
+                "member_id": {
+                    "type": "integer"
+                }
+            }
+        },
+        "github_com_shseooo_go-architecture_app_domain.Address": {
+            "type": "object",
+            "properties": {
+                "city": {
+                    "type": "string"
+                },
+                "street": {
+                    "type": "string"
+                },
+                "zipcode": {
+                    "type": "string"
+                }
+            }
+        },
+        "github_com_shseooo_go-architecture_app_domain.Delivery": {
+            "type": "object",
+            "properties": {
+                "address": {
+                    "$ref": "#/definitions/github_com_shseooo_go-architecture_app_domain.Address"
+                },
+                "id": {
+                    "type": "integer"
+                },
+                "status": {
+                    "$ref": "#/definitions/github_com_shseooo_go-architecture_app_domain.DeliveryStatus"
+                }
+            }
+        },
+        "github_com_shseooo_go-architecture_app_domain.DeliveryStatus": {
+            "type": "string",
+            "enum": [
+                "READY",
+                "COMP"
+            ],
+            "x-enum-comments": {
+                "DeliveryStatusComp": "shipping completed",
+                "DeliveryStatusReady": "not yet shipped"
+            },
+            "x-enum-descriptions": [
+                "not yet shipped",
+                "shipping completed"
+            ],
+            "x-enum-varnames": [
+                "DeliveryStatusReady",
+                "DeliveryStatusComp"
+            ]
+        },
+        "github_com_shseooo_go-architecture_app_domain.Item": {
+            "type": "object",
+            "properties": {
+                "actor": {
+                    "type": "string"
+                },
+                "artist": {
+                    "description": "Album",
+                    "type": "string"
+                },
+                "author": {
+                    "description": "Book",
+                    "type": "string"
+                },
+                "category_ids": {
+                    "description": "CategoryIDs the item belongs to (many-to-many via category_item).",
+                    "type": "array",
+                    "items": {
+                        "type": "integer"
+                    }
+                },
+                "created_at": {
+                    "type": "string"
+                },
+                "director": {
+                    "description": "Movie",
+                    "type": "string"
+                },
+                "etc": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "integer"
+                },
+                "isbn": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "price": {
+                    "type": "integer"
+                },
+                "stock_quantity": {
+                    "type": "integer"
+                },
+                "type": {
+                    "$ref": "#/definitions/github_com_shseooo_go-architecture_app_domain.ItemType"
+                }
+            }
+        },
+        "github_com_shseooo_go-architecture_app_domain.ItemType": {
+            "type": "string",
+            "enum": [
+                "BOOK",
+                "ALBUM",
+                "MOVIE"
+            ],
+            "x-enum-varnames": [
+                "ItemTypeBook",
+                "ItemTypeAlbum",
+                "ItemTypeMovie"
+            ]
+        },
+        "github_com_shseooo_go-architecture_app_domain.Member": {
+            "type": "object",
+            "properties": {
+                "address": {
+                    "$ref": "#/definitions/github_com_shseooo_go-architecture_app_domain.Address"
+                },
+                "id": {
+                    "type": "integer"
+                },
+                "name": {
+                    "type": "string"
+                }
+            }
+        },
+        "github_com_shseooo_go-architecture_app_domain.Order": {
+            "type": "object",
+            "properties": {
+                "delivery": {
+                    "$ref": "#/definitions/github_com_shseooo_go-architecture_app_domain.Delivery"
+                },
+                "delivery_id": {
+                    "type": "integer"
+                },
+                "id": {
+                    "type": "integer"
+                },
+                "member_id": {
+                    "type": "integer"
+                },
+                "order_date": {
+                    "type": "string"
+                },
+                "order_items": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/github_com_shseooo_go-architecture_app_domain.OrderItem"
+                    }
+                },
+                "status": {
+                    "$ref": "#/definitions/github_com_shseooo_go-architecture_app_domain.OrderStatus"
+                }
+            }
+        },
+        "github_com_shseooo_go-architecture_app_domain.OrderItem": {
+            "type": "object",
+            "properties": {
+                "count": {
+                    "type": "integer"
+                },
+                "id": {
+                    "type": "integer"
+                },
+                "item_id": {
+                    "type": "integer"
+                },
+                "item_name": {
+                    "type": "string"
+                },
+                "order_id": {
+                    "type": "integer"
+                },
+                "order_price": {
+                    "type": "integer"
+                }
+            }
+        },
+        "github_com_shseooo_go-architecture_app_domain.OrderStatus": {
+            "type": "string",
+            "enum": [
+                "ORDER",
+                "CANCEL"
+            ],
+            "x-enum-varnames": [
+                "OrderStatusOrder",
+                "OrderStatusCancel"
+            ]
+        }
+    }
+}
