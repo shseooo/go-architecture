@@ -1,130 +1,120 @@
 # go-architecture
 
-A clean-architecture sample shop API in Go, built with the **standard library only**
-(`net/http`, `database/sql`) — no web framework, no ORM. It demonstrates layered
-boundaries, transactional use-cases, dynamic queries, and end-to-end tests against a
-real database.
+A **modular monolith** shop API in Go, built with the standard library
+(`net/http`, `database/sql`) plus [sqlc](https://sqlc.dev) for type-safe queries
+and [goose](https://github.com/pressly/goose) for migrations. It demonstrates
+bounded-context modules with enforced boundaries, transactional cross-module
+use-cases, dynamic queries, a standardized response envelope, and end-to-end
+tests against a real database.
 
-## Layers & data flow
+## Bounded contexts
+
+The application is split into self-contained modules; each owns its tables and
+exposes a small public API. Other modules depend only on that public API — never
+on a module's internals (the Go compiler enforces this via the nested
+`internal/` directory).
 
 ```
-                 ┌─────────────────────────────────────────────┐
-  HTTP request → │ rest      (net/http handlers, JSON, routing) │
-                 │   ↓ depends on interfaces                    │
-                 │ service   (business rules, transactions)     │
-                 │   ↓ depends on interfaces                    │
-                 │ repository/mysql (database/sql)              │
-                 └───────────────────┬─────────────────────────┘
-                                     ↓
-                                 domain  (entities — no dependencies)
+              cmd/api (composition root — wires modules + cross-context adapters)
+                 │
+     ┌───────────┼────────────┐
+     ▼           ▼            ▼
+  ordering    customer     catalog     ← contexts; ordering talks to the others
+     │  (via consumer-defined gateways, adapted at the root)
+     └───────────┬────────────┘
+                 ▼
+     shared (Address, error taxonomy)  +  platform (database, httpx)
 ```
 
-- Dependencies point **inward**: `domain` imports nothing; outer layers depend on
-  interfaces they define themselves (consumer-defined interfaces).
-- The web framework and SQL live only at the edges, so they are swappable and every
-  layer is unit-testable with a stub.
+Inside each module the layering is the same: `domain` (entities) ← `app`
+(use-cases, consumer-defined repository interfaces) ← `repo` (sqlc) / `rest`
+(net/http). Cross-context calls (e.g. ordering reserving stock in catalog) run in
+one transaction because all modules share a single `*sql.DB` and a context-based
+`TxManager`.
 
-## Project structure
+## Structure
 
 ```
 cmd/
-  api/main.go        HTTP server entrypoint (graceful shutdown)
-  import/            one-off CSV → DB batch importer (+ items.sample.csv)
-config/db.go         MySQL connection
-bootstrap/           wires repositories → services → handlers into one http.Handler
-schema.sql           database schema (member / item / order …)
+  api/main.go        HTTP server (graceful shutdown)
+  import/            one-off CSV → DB batch importer
+  migrate/           goose migration runner
+migrations/          goose SQL migrations (embedded)
+sqlc.yaml            sqlc config (schema = migrations, one package per module)
+internal/
+  platform/
+    database/        connection + TxManager (context-based transactions)
+    httpx/           response envelope, error mapping, middleware
+  shared/            shared kernel: Address value object, error taxonomy
+  bootstrap/         wires modules + cross-context adapters into one handler
+  catalog/           item / category context   (catalog.go = public API)
+    internal/{domain,app,repo,rest}
+  customer/          member context            (customer.go = public API)
+    internal/{domain,app,repo,rest}
+  ordering/          order / delivery context  (ordering.go = public API)
+    internal/{domain,repo,rest}
 deploy/              Dockerfile, docker-compose.yaml
 docs/                generated OpenAPI 2.0 spec (swaggo)
-app/
-  domain/            entities: member, item, order, category, delivery
-  service/{member,item,order}/   use-cases + repository interfaces
-  repository/mysql/  database/sql implementations + TxManager
-  rest/              net/http handlers, middleware, router
-e2e/                 testcontainers-based end-to-end tests (build tag: e2e)
+e2e/                 testcontainers end-to-end tests (build tag: e2e)
 ```
-
-## Domain
-
-A small shop: **members** place **orders** for **items** (books, albums, movies via
-single-table inheritance), organized into **categories**, shipped via a **delivery**.
-
-Highlights:
-- **Stock management** — stock is decremented on order and restored on cancel.
-- **Transactions** — placing/canceling an order commits stock, delivery and order
-  rows atomically via a context-based `TxManager`.
-- **No N+1** — order listings batch-load their items and deliveries with `IN` queries.
-- **Dynamic queries** — item search filters by category/price range and sorts by
-  date/price, with an allow-listed `ORDER BY` (injection-safe).
 
 ## API
 
 | Area   | Endpoint |
 |--------|----------|
 | Member | `POST /members`, `GET /members/{id}` |
-| Item   | `POST /items`, `PUT /items/{id}`, `GET /items/{id}`, `GET /items?categoryId=&minPrice=&maxPrice=&sort=` |
+| Item   | `POST /items`, `PUT /items/{id}`, `GET /items/{id}`, `GET /items?categoryId=&minPrice=&maxPrice=&sort=&limit=&offset=` |
 | Order  | `POST /orders`, `GET /members/{id}/orders`, `POST /orders/{id}/cancel` |
 | Misc   | `GET /healthz`, `GET /swagger/index.html` |
 
-## Getting started
+Responses use a consistent envelope:
 
-Requires Go 1.24+ (uses `net/http` method routing) and Docker.
-
-```bash
-# clone
-git clone https://github.com/shseooo/go-architecture.git
-cd go-architecture
-
-# configure
-cp example.env .env
-
-# run MySQL + hot-reloading app via docker-compose
-make up
+```jsonc
+{ "data": { … } }                                   // single
+{ "data": [ … ] }                                   // array
+{ "data": [ … ], "meta": { "pagination": { … } } }  // paged
+{ "error": { "code": "NOT_FOUND", "message": "…" } }// error
 ```
 
-The server listens on `:9090`. Try:
+## Getting started
+
+Requires Go 1.26+, Docker.
+
+```bash
+git clone https://github.com/shseooo/go-architecture.git
+cd go-architecture
+cp example.env .env
+
+make up          # start MySQL (docker-compose) + hot-reloading app (air)
+make migrate     # apply goose migrations
+```
 
 ```bash
 curl localhost:9090/items
 open http://localhost:9090/swagger/index.html
 ```
 
-## Testing
+## Development
 
 ```bash
 make tests        # unit tests (services, fast, no external deps)
 make test-e2e     # end-to-end tests against a real MySQL (requires Docker)
-```
-
-Unit tests drive the services through stubbed repositories. The E2E suite spins up a
-real MySQL with [testcontainers](https://golang.testcontainers.org/), calls the HTTP
-API, and asserts **both the response and the actual database state**.
-
-## CSV importer
-
-A single-run batch job under `cmd/import` loads items from a CSV through the item
-service (same validation as the API):
-
-```bash
-go run ./cmd/import -file cmd/import/items.sample.csv
-```
-
-## API docs (Swagger)
-
-Annotations live on the handlers; regenerate the OpenAPI 2.0 spec with:
-
-```bash
-make swagger      # runs swag init → docs/
+make migrate      # goose up          (migrate-status for status)
+make swagger      # regenerate docs/  from handler annotations
+sqlc generate     # regenerate the typed DB layer from queries + migrations
+go run ./cmd/import -file cmd/import/items.sample.csv   # CSV import
 ```
 
 ## Tech stack
 
-- **HTTP**: standard library `net/http` (Go 1.22+ routing)
-- **DB**: standard library `database/sql` + `go-sql-driver/mysql`
+- **HTTP**: standard library `net/http` (Go 1.22+ routing), no framework
+- **DB**: `database/sql` + `go-sql-driver/mysql`, queries via **sqlc**
+- **Migrations**: **goose** (embedded, shared by the app and tests)
 - **Docs**: `swaggo/swag` + `swaggo/http-swagger`
 - **Tests**: `testify`, `testcontainers-go`
 
 ---
 
 Based on the Clean Architecture idea popularized by
-[bxcodec/go-clean-arch](https://github.com/bxcodec/go-clean-arch); reworked to a shop
-domain on the standard library.
+[bxcodec/go-clean-arch](https://github.com/bxcodec/go-clean-arch); reworked into
+a modular-monolith shop domain on the standard library + sqlc/goose.

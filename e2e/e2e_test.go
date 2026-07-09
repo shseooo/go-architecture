@@ -21,11 +21,13 @@ import (
 	"time"
 
 	_ "github.com/go-sql-driver/mysql"
+	"github.com/pressly/goose/v3"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/testcontainers/testcontainers-go/modules/mysql"
 
-	"github.com/shseooo/go-architecture/bootstrap"
+	"github.com/shseooo/go-architecture/internal/bootstrap"
+	"github.com/shseooo/go-architecture/migrations"
 )
 
 var (
@@ -40,7 +42,6 @@ func TestMain(m *testing.M) {
 		mysql.WithDatabase("shop"),
 		mysql.WithUsername("user"),
 		mysql.WithPassword("password"),
-		mysql.WithScripts("../schema.sql"),
 	)
 	if err != nil {
 		fmt.Println("failed to start mysql container:", err)
@@ -58,7 +59,18 @@ func TestMain(m *testing.M) {
 		os.Exit(1)
 	}
 
-	srv := httptest.NewServer(bootstrap.NewHandler(testDB, 30*time.Second))
+	// apply schema via goose (same migrations as production)
+	goose.SetBaseFS(migrations.FS)
+	if err := goose.SetDialect("mysql"); err != nil {
+		fmt.Println("goose dialect:", err)
+		os.Exit(1)
+	}
+	if err := goose.Up(testDB, "."); err != nil {
+		fmt.Println("failed to migrate:", err)
+		os.Exit(1)
+	}
+
+	srv := httptest.NewServer(bootstrap.Handler(testDB, 30*time.Second))
 	baseURL = srv.URL
 
 	code := m.Run()
