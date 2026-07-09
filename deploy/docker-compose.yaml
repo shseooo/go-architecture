@@ -1,22 +1,8 @@
-version: "3.7"
 services:
-  web:
-    image: go-clean-arch
-    container_name: article_management_api
-    ports:
-      - 9090:9090
-    depends_on:
-      mysql:
-        condition: service_healthy
-    volumes:
-      - ../config.json:/app/config.json
-
   mysql:
     image: mysql:8.3
-    container_name: go_clean_arch_mysql
+    container_name: shop_mysql
     command: mysqld --user=root
-    volumes:
-      - ../schema.sql:/docker-entrypoint-initdb.d/init.sql
     ports:
       - 3306:3306
     environment:
@@ -28,3 +14,22 @@ services:
       test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
       timeout: 5s
       retries: 10
+
+  # The web image is built via `make image-build`. Schema is applied with goose
+  # (`make migrate`), not a SQL init mount.
+  web:
+    image: go-architecture
+    container_name: shop_api
+    ports:
+      - 9090:9090
+    depends_on:
+      mysql:
+        condition: service_healthy
+    environment:
+      - SERVER_ADDRESS=:9090
+      - CONTEXT_TIMEOUT=30
+      - DATABASE_HOST=mysql
+      - DATABASE_PORT=3306
+      - DATABASE_USER=user
+      - DATABASE_PASS=password
+      - DATABASE_NAME=shop

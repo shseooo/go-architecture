@@ -13,8 +13,8 @@ import (
 
 	"github.com/joho/godotenv"
 
-	"github.com/shseooo/go-architecture/bootstrap"
-	"github.com/shseooo/go-architecture/config"
+	"github.com/shseooo/go-architecture/internal/bootstrap"
+	"github.com/shseooo/go-architecture/internal/platform/database"
 )
 
 const (
@@ -24,7 +24,6 @@ const (
 )
 
 func init() {
-	// .env is optional: containers/production provide env vars directly.
 	if err := godotenv.Load(); err != nil {
 		slog.Info("no .env file found, using environment variables")
 	}
@@ -32,7 +31,7 @@ func init() {
 
 // @title           Shop API
 // @version         1.0
-// @description     회원/상품/주문 API — clean architecture, stdlib net/http.
+// @description     회원/상품/주문 API — modular monolith, stdlib net/http, sqlc.
 // @host            localhost:9090
 // @BasePath        /
 func main() {
@@ -43,18 +42,17 @@ func main() {
 }
 
 func run() error {
-	dbConn, err := config.NewMySQLConn()
+	db, err := database.Open()
 	if err != nil {
 		return err
 	}
-	defer dbConn.Close()
+	defer db.Close()
 
 	srv := &http.Server{
 		Addr:    serverAddress(),
-		Handler: bootstrap.NewHandler(dbConn, requestTimeout()),
+		Handler: bootstrap.Handler(db, requestTimeout()),
 	}
 
-	// Run the server until an interrupt/terminate signal arrives.
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 

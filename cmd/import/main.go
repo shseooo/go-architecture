@@ -1,6 +1,6 @@
 // Command import is a one-off batch job that reads a CSV of items and inserts
-// them through the item service (so the same validation and category linking as
-// the HTTP API apply). It is a single-run command, not a long-running queue
+// them through the catalog module (so the same validation and category linking
+// as the HTTP API apply). It is a single-run command, not a long-running queue
 // worker — hence it lives under cmd/import.
 //
 // Usage:
@@ -28,10 +28,8 @@ import (
 
 	"github.com/joho/godotenv"
 
-	"github.com/shseooo/go-architecture/app/domain"
-	mysqlRepo "github.com/shseooo/go-architecture/app/repository/mysql"
-	"github.com/shseooo/go-architecture/app/service/item"
-	"github.com/shseooo/go-architecture/config"
+	"github.com/shseooo/go-architecture/internal/catalog"
+	"github.com/shseooo/go-architecture/internal/platform/database"
 )
 
 func main() {
@@ -49,13 +47,13 @@ func run() error {
 	}
 
 	_ = godotenv.Load()
-	db, err := config.NewMySQLConn()
+	db, err := database.Open()
 	if err != nil {
 		return err
 	}
 	defer db.Close()
 
-	svc := item.NewService(mysqlRepo.NewItemRepository(db))
+	cat := catalog.New(db)
 
 	f, err := os.Open(*csvPath)
 	if err != nil {
@@ -77,7 +75,7 @@ func run() error {
 
 	ctx := context.Background()
 	var imported, failed int
-	for line := 2; ; line++ { // line 1 was the header
+	for line := 2; ; line++ {
 		record, err := reader.Read()
 		if errors.Is(err, io.EOF) {
 			break
@@ -88,19 +86,20 @@ func run() error {
 			continue
 		}
 
-		it, err := parseItem(record, cols)
+		in, err := parseItem(record, cols)
 		if err != nil {
 			slog.Warn("skipping invalid row", "line", line, "error", err)
 			failed++
 			continue
 		}
-		if err := svc.Create(ctx, it); err != nil {
-			slog.Warn("failed to import row", "line", line, "name", it.Name, "error", err)
+		id, err := cat.CreateItem(ctx, in)
+		if err != nil {
+			slog.Warn("failed to import row", "line", line, "name", in.Name, "error", err)
 			failed++
 			continue
 		}
 		imported++
-		slog.Info("imported item", "id", it.ID, "name", it.Name)
+		slog.Info("imported item", "id", id, "name", in.Name)
 	}
 
 	slog.Info("import finished", "imported", imported, "failed", failed)
@@ -110,8 +109,6 @@ func run() error {
 	return nil
 }
 
-// indexColumns maps required/optional column names to their position, verifying
-// that the required columns are present.
 func indexColumns(header []string) (map[string]int, error) {
 	cols := make(map[string]int, len(header))
 	for i, name := range header {
@@ -125,7 +122,7 @@ func indexColumns(header []string) (map[string]int, error) {
 	return cols, nil
 }
 
-func parseItem(record []string, cols map[string]int) (*domain.Item, error) {
+func parseItem(record []string, cols map[string]int) (catalog.NewItem, error) {
 	get := func(name string) string {
 		if i, ok := cols[name]; ok && i < len(record) {
 			return strings.TrimSpace(record[i])
@@ -135,23 +132,22 @@ func parseItem(record []string, cols map[string]int) (*domain.Item, error) {
 
 	price, err := strconv.Atoi(get("price"))
 	if err != nil {
-		return nil, fmt.Errorf("invalid price %q: %w", get("price"), err)
+		return catalog.NewItem{}, fmt.Errorf("invalid price %q: %w", get("price"), err)
 	}
 	stock, err := strconv.Atoi(get("stock_quantity"))
 	if err != nil {
-		return nil, fmt.Errorf("invalid stock_quantity %q: %w", get("stock_quantity"), err)
+		return catalog.NewItem{}, fmt.Errorf("invalid stock_quantity %q: %w", get("stock_quantity"), err)
 	}
-
 	categoryIDs, err := parseCategoryIDs(get("category_ids"))
 	if err != nil {
-		return nil, err
+		return catalog.NewItem{}, err
 	}
 
-	return &domain.Item{
+	return catalog.NewItem{
 		Name:          get("name"),
 		Price:         price,
 		StockQuantity: stock,
-		Type:          domain.ItemType(strings.ToUpper(get("type"))),
+		Type:          strings.ToUpper(get("type")),
 		Author:        get("author"),
 		ISBN:          get("isbn"),
 		Artist:        get("artist"),

@@ -88,6 +88,12 @@ swagger: ## Generate OpenAPI 2.0 docs (swaggo/swag) into ./docs
 test-e2e: ## Run end-to-end tests (requires Docker)
 	@ go test -tags e2e -timeout 15m ./e2e/...
 
+migrate: ## Apply goose migrations (uses .env / environment for DB connection)
+	@ go run ./cmd/migrate up
+
+migrate-status: ## Show goose migration status
+	@ go run ./cmd/migrate status
+
 
 TESTS_ARGS := --format testname --jsonfile gotestsum.json.out
 TESTS_ARGS += --max-fails 2
@@ -112,7 +118,7 @@ image-build:
 	@ echo "Docker Build"
 	@ DOCKER_BUILDKIT=0 docker build \
 		--file deploy/Dockerfile \
-		--tag go-clean-arch \
+		--tag go-architecture \
 			.
 
 # Commenting this as this not relevant for the project, we load the DB data from the SQL file.
