@@ -1,0 +1,29 @@
+version: "2"
+sql:
+  # Each module gets its own generated package, but they all share the full
+  # schema (the goose migrations) so cross-table reads (e.g. order_item JOIN
+  # item) type-check.
+  - engine: mysql
+    schema: migrations
+    queries: internal/customer/internal/repo/queries.sql
+    gen:
+      go:
+        package: sqlcdb
+        out: internal/customer/internal/repo/sqlcdb
+        emit_interface: true
+  - engine: mysql
+    schema: migrations
+    queries: internal/catalog/internal/repo/queries.sql
+    gen:
+      go:
+        package: sqlcdb
+        out: internal/catalog/internal/repo/sqlcdb
+        emit_interface: true
+  - engine: mysql
+    schema: migrations
+    queries: internal/ordering/internal/repo/queries.sql
+    gen:
+      go:
+        package: sqlcdb
+        out: internal/ordering/internal/repo/sqlcdb
+        emit_interface: true
